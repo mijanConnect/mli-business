@@ -19,20 +19,21 @@ const extractRefreshToken = (payload) =>
 export async function refreshAuthSession() {
   const refreshToken = getRefreshToken();
 
-  if (!refreshToken) {
-    return null;
-  }
-
   try {
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (refreshToken) {
+      headers.Authorization = refreshToken;
+    }
+
     const response = await fetch(`${getApiBaseUrl()}${getRefreshPath()}`, {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: refreshToken,
-      },
+      headers,
       body: JSON.stringify({
-        refreshToken,
+        refreshToken: refreshToken || undefined,
+        device: "merchant",
       }),
     });
 
@@ -66,13 +67,17 @@ export async function logoutAuthSession() {
   const refreshToken = getRefreshToken();
 
   try {
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (refreshToken) {
+      headers.Authorization = refreshToken;
+    }
+
     await fetch(`${getApiBaseUrl()}${getLogoutPath()}`, {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: refreshToken,
-      },
+      headers,
     });
   } catch (error) {
     if (import.meta?.env?.DEV) {

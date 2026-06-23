@@ -1,3 +1,5 @@
+import Cookies from "js-cookie";
+
 const RESET_TOKEN_KEY = "resetToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
 
@@ -16,7 +18,7 @@ const reportStorageIssue = (operation, error) => {
 
 const readItem = (key) => {
   try {
-    return sessionStorage.getItem(key);
+    return Cookies.get(key) || null;
   } catch (error) {
     reportStorageIssue(`read ${key}`, error);
     return null;
@@ -25,7 +27,7 @@ const readItem = (key) => {
 
 const writeItem = (key, value) => {
   try {
-    sessionStorage.setItem(key, value);
+    Cookies.set(key, value, { expires: 30, secure: window.location.protocol === "https:", sameSite: 'lax' });
   } catch (error) {
     reportStorageIssue(`write ${key}`, error);
   }
@@ -33,7 +35,7 @@ const writeItem = (key, value) => {
 
 const removeItem = (key) => {
   try {
-    sessionStorage.removeItem(key);
+    Cookies.remove(key);
   } catch (error) {
     reportStorageIssue(`remove ${key}`, error);
   }
@@ -49,18 +51,20 @@ const removeFromStorage = (storage, keys) => {
   });
 };
 
-const clearLegacyLocalStorageAuthTokens = () => {
+const purgeLegacySessionData = () => {
   if (typeof window === "undefined") {
     return;
   }
 
+  removeFromStorage(sessionStorage, [
+    ...LEGACY_ACCESS_TOKEN_KEYS,
+  ]);
+
+  // Clean up legacy tokens from localStorage
   removeFromStorage(localStorage, [
     ...LEGACY_ACCESS_TOKEN_KEYS,
     ...LEGACY_REFRESH_TOKEN_KEYS,
   ]);
-
-  // Access tokens must not persist in browser storage.
-  removeFromStorage(sessionStorage, LEGACY_ACCESS_TOKEN_KEYS);
 };
 
 const emitAuthChange = (type) => {
@@ -71,7 +75,7 @@ const emitAuthChange = (type) => {
   window.dispatchEvent(new CustomEvent("auth:changed", { detail: { type } }));
 };
 
-clearLegacyLocalStorageAuthTokens();
+purgeLegacySessionData();
 
 export function getAuthToken() {
   return accessToken;
@@ -131,7 +135,7 @@ export function clearResetToken() {
 export function clearAuthToken() {
   accessToken = null;
   removeItem(REFRESH_TOKEN_KEY);
-  clearLegacyLocalStorageAuthTokens();
+  purgeLegacySessionData();
   emitAuthChange("token-cleared");
 }
 
