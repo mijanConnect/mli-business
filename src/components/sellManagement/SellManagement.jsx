@@ -24,8 +24,10 @@ const { Option } = Select;
 const SellManagement = () => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [selectedCards, setSelectedCards] = useState([]);
   const [data, setData] = useState([]);
+
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   const [searchText, setSearchText] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
@@ -34,7 +36,6 @@ const SellManagement = () => {
   const [form] = Form.useForm();
   const isInitialMount = React.useRef(true);
 
-  // Get user data to check role
   const { user } = useUser();
 
   const [searchInput, setSearchInput] = useState(searchText);
@@ -45,13 +46,11 @@ const SellManagement = () => {
       setPagination((prev) => ({ ...prev, current: 1 }));
 
       updateURL({ searchTerm: searchInput, page: 1 });
-      setData([]); // optional: immediate UI clear
-    }, 500); // debounce delay (500ms)
+    }, 500);
 
     return () => clearTimeout(handler);
   }, [searchInput]);
 
-  // Initialize state from URL parameters on mount only
   useEffect(() => {
     if (isInitialMount.current) {
       const page = parseInt(searchParams.get("page")) || 1;
@@ -64,11 +63,11 @@ const SellManagement = () => {
       setSearchText(term);
       setSelectedMonth(monthParam);
       setIsNewSellPage(view === "newsell");
+
       isInitialMount.current = false;
     }
   }, []);
 
-  // Update URL whenever pagination changes (only after initial mount)
   useEffect(() => {
     if (!isInitialMount.current) {
       const newParams = new URLSearchParams(searchParams);
@@ -78,7 +77,6 @@ const SellManagement = () => {
     }
   }, [pagination.current, pagination.pageSize]);
 
-  // Fetch today's sales from API
   const {
     data: apiData,
     isLoading,
@@ -91,37 +89,32 @@ const SellManagement = () => {
     searchTerm: searchText,
   });
 
-  // Update local data when API data changes
+  // ✅ FIXED: stable data handling (no conditional length check)
   useEffect(() => {
-    if (
-      apiData?.data &&
-      Array.isArray(apiData.data) &&
-      apiData.data.length > 0
-    ) {
-      const formattedData = apiData.data.map((item, index) => ({
-        id: item._id || `${item.phone}-${Date.now()}-${index}`,
-        customerName: item.name || "-",
-        email: item.email || "-",
-        phone: item.phone || "-",
-        totalTransactions: (item.totalTransactions || 0).toFixed(2),
-        totalAmount: (item.totalBilled || 0).toFixed(2),
-        pointEarned: (item.totalPointsEarned || 0).toFixed(2),
-        pointRedeem: (item.totalPointsRedeemed || 0).toFixed(2),
-        finalAmount: (item.finalBilled || 0).toFixed(2),
-        cardIds: item.cardIds || "-",
-        transactionStatus: item.status || "Pending",
-        date: item.date || new Date().toISOString().split("T")[0],
-      }));
-      setData(formattedData);
-    } else {
-      setData([]);
-    }
+    const list = Array.isArray(apiData?.data) ? apiData.data : [];
+
+    const formattedData = list.map((item, index) => ({
+      id: item._id || `${item.phone}-${Date.now()}-${index}`,
+      customerName: item.name || "-",
+      email: item.email || "-",
+      phone: item.phone || "-",
+      totalTransactions: (item.totalTransactions || 0).toFixed(2),
+      totalAmount: (item.totalBilled || 0).toFixed(2),
+      pointEarned: (item.totalPointsEarned || 0).toFixed(2),
+      pointRedeem: (item.totalPointsRedeemed || 0).toFixed(2),
+      finalAmount: (item.finalBilled || 0).toFixed(2),
+      cardIds: item.cardIds || "-",
+      transactionStatus: item.status || "Pending",
+      date: item.date || new Date().toISOString().split("T")[0],
+    }));
+
+    setData(formattedData);
   }, [apiData]);
 
   const handleMonthChange = (month) => {
     setSelectedMonth(month || "");
     setPagination({ current: 1, pageSize: pagination.pageSize });
-    setData([]); // Clear data immediately
+
     updateURL({ month: month || "", page: 1 });
   };
 
@@ -132,42 +125,30 @@ const SellManagement = () => {
   const updateURL = (params) => {
     const newParams = new URLSearchParams(searchParams);
     Object.entries(params).forEach(([key, value]) => {
-      if (value) {
-        newParams.set(key, value);
-      } else {
-        newParams.delete(key);
-      }
+      if (value) newParams.set(key, value);
+      else newParams.delete(key);
     });
     setSearchParams(newParams);
   };
 
-  const filteredData = data;
-
-  const handleNewSellSubmit = async (values) => {
+  const handleNewSellSubmit = async () => {
     setEditingRow(null);
-    // Reset pagination to first page
+
     setPagination({ current: 1, pageSize: 10 });
 
-    // Remove view, page, and limit from URL - keep only search and month if they exist
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("view");
     newParams.delete("page");
     newParams.delete("limit");
     setSearchParams(newParams);
+
     setIsNewSellPage(false);
 
     try {
-      // Clear the entire API cache first
-      dispatch(api.util.resetApiState());
+      // ✅ Just refetch safely (RTK Query handles cache automatically)
+      await refetch();
 
-      // Small delay to ensure cache is cleared
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Now refetch - will get fresh data from API
-      const result = await refetch();
-
-      // The useEffect will automatically update the table with new data
-      message.success("Transaction completed and data refreshed!");
+      // message.success("Transaction completed and data refreshed!");
     } catch (error) {
       console.error("Refetch error:", error);
       message.error("Failed to refresh data");
@@ -175,7 +156,7 @@ const SellManagement = () => {
   };
 
   const handleEdit = (record) => {
-    setEditingRow({ ...record, date: dayjs(record.date) }); // Ensure date is a valid dayjs object
+    setEditingRow({ ...record, date: dayjs(record.date) });
     setIsNewSellPage(true);
     updateURL({ view: "newsell" });
   };
@@ -184,8 +165,7 @@ const SellManagement = () => {
     setIsNewSellPage(false);
     setEditingRow(null);
     updateURL({ view: "" });
-    // Clear data and refetch to ensure fresh data when returning
-    setData([]);
+
     refetch();
   };
 
@@ -196,13 +176,11 @@ const SellManagement = () => {
       cancelText: "No",
       onOk: () => {
         message.success("Entry deleted successfully");
-        // API call to delete would go here
       },
     });
   };
 
   const handleTableChange = (pageNumber, pageSize) => {
-    setData([]); // Clear data immediately when pagination changes
     setPagination({
       current: pageNumber || 1,
       pageSize: pageSize || 10,
@@ -297,9 +275,9 @@ const SellManagement = () => {
     return (
       <NewSell
         onBack={handleBackFromNewSell}
-        onSubmit={handleNewSellSubmit} // Pass the function as a prop
-        editingRow={editingRow} // Pass the editing row data
-        refetch={refetch} // Pass refetch function to refresh data after creation
+        onSubmit={handleNewSellSubmit}
+        editingRow={editingRow}
+        refetch={refetch}
       />
     );
   }
@@ -309,6 +287,7 @@ const SellManagement = () => {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-[24px] font-bold">Today’s Sell</h1>
       </div>
+
       <div className="flex flex-row items-start justify-between gap-4 mb-4">
         <div className="flex gap-4">
           <Input
@@ -318,33 +297,34 @@ const SellManagement = () => {
             onClear={() => {
               setSearchText("");
               setPagination({ current: 1, pageSize: pagination.pageSize });
-              setData([]); // Clear data immediately
+
               const newParams = new URLSearchParams(searchParams);
               newParams.delete("searchTerm");
               newParams.set("page", 1);
               setSearchParams(newParams);
             }}
-            style={{ width: 300 }}
+            style={{ width: 300, height: 40 }}
             allowClear
           />
+
           <Select
             placeholder="Filter by Month"
-            style={{ width: 200 }}
+            style={{ width: 200, height: 40 }}
             onChange={handleMonthChange}
             value={selectedMonth || undefined}
             allowClear
-            className="text-[14px] h-10"
           >
-            <Option key="all" value="">
-              All Months
-            </Option>
+            <Option value="">All Months</Option>
             {Array.from({ length: 12 }, (_, i) => (
               <Option key={i + 1} value={String(i + 1)}>
-                {new Date(0, i).toLocaleString("default", { month: "long" })}
+                {new Date(0, i).toLocaleString("default", {
+                  month: "long",
+                })}
               </Option>
             ))}
           </Select>
         </div>
+
         <Button
           onClick={() => {
             setIsNewSellPage(true);
@@ -359,7 +339,7 @@ const SellManagement = () => {
 
       <div className="overflow-x-auto">
         <CustomTable
-          data={filteredData}
+          data={data}
           columns={columns}
           isLoading={isLoading}
           isFetching={isFetching}
