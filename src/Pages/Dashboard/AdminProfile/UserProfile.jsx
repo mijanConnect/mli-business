@@ -275,6 +275,7 @@ const UserProfile = () => {
                 fileList={fileList}
                 listType="picture-card"
                 maxCount={1}
+                disabled={isMerchantRole}
               >
                 {imageUrl ? (
                   <Avatar
@@ -528,6 +529,7 @@ const UserProfile = () => {
             <Input
               placeholder="Enter your address"
               className="mli-tall-input"
+              disabled={isMerchantRole}
             />
           </Form.Item>
 
@@ -547,6 +549,7 @@ const UserProfile = () => {
               listType="picture-card"
               maxCount={1}
               className="ant-upload-2"
+              disabled={isMerchantRole}
             >
               {coverImageUrl ? (
                 <div
@@ -644,6 +647,7 @@ const UserProfile = () => {
                 minHeight: "120px",
                 resize: "vertical",
               }}
+              disabled={isMerchantRole}
             />
           </Form.Item>
 

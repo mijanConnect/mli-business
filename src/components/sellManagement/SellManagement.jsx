@@ -94,7 +94,7 @@ const SellManagement = () => {
     const list = Array.isArray(apiData?.data) ? apiData.data : [];
 
     const formattedData = list.map((item, index) => ({
-      id: item._id || `${item.phone}-${Date.now()}-${index}`,
+      id: `${item._id}-${index}`,
       customerName: item.name || "-",
       email: item.email || "-",
       phone: item.phone || "-",
@@ -105,7 +105,7 @@ const SellManagement = () => {
       finalAmount: (item.finalBilled || 0).toFixed(2),
       cardIds: item.cardIds || "-",
       transactionStatus: item.status || "Pending",
-      date: item.date || new Date().toISOString().split("T")[0],
+      date: item.date,
     }));
 
     setData(formattedData);
@@ -349,7 +349,7 @@ const SellManagement = () => {
             total: apiData?.pagination?.total || 0,
           }}
           onPaginationChange={handleTableChange}
-          rowKey="id"
+          rowKey={(record) => record.id}
         />
       </div>
     </div>
