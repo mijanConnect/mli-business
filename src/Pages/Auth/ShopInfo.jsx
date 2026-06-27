@@ -61,7 +61,7 @@ const ShopInfo = () => {
       country: values.country,
       city: values.city,
       service: values.service,
-      address: values.address,
+      about: values.about,
     };
 
     Object.entries(payloadMap).forEach(([key, val]) => {
@@ -257,16 +257,16 @@ const ShopInfo = () => {
           </Upload>
         </Form.Item>
 
-        {/* Shop Address */}
+        {/* Shop about */}
         <Form.Item
-          name="address"
+          name="about"
           rules={[
-            { required: true, message: "Please enter your shop address" },
+            { required: true, message: "Please enter your shop about" },
           ]}
           style={{ marginBottom: 24 }}
         >
           <Input.TextArea
-            placeholder="Enter Your Shop Address"
+            placeholder="Enter Your Shop About"
             rows={4}
             style={{
               border: "1px solid #3FAE6A",
