@@ -14,18 +14,20 @@ import Swal from "sweetalert2";
 import { useSendNotificationMutation } from "../../../redux/apiSlices/promoSlice";
 import {
   GoogleMap,
-  LoadScript,
+  useJsApiLoader,
   Marker,
   InfoWindow,
   Circle,
 } from "@react-google-maps/api";
+
+const libraries = ["places"];
 
 // Location Map Picker Component using Google Maps
 const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
   const [location, setLocation] = useState(
     selectedLocation || { lat: 24.8607, lng: 67.0011 },
   ); // Default to Karachi
-  const [showInfoWindow, setShowInfoWindow] = useState(true);
+  const [locationName, setLocationName] = useState("");
   const [mapLoaded, setMapLoaded] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -54,7 +56,29 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
     backgroundColor: "#f5f5f5",
   };
 
-  const libraries = ["places"];
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY || "",
+    libraries: libraries,
+  });
+
+  useEffect(() => {
+    if (isLoaded && window.google?.maps) {
+      setMapLoaded(true);
+      geocoderRef.current = new window.google.maps.Geocoder();
+
+      if (!locationName) {
+        geocoderRef.current.geocode({ location }, (results, status) => {
+          if (status === "OK" && results[0]) {
+            setLocationName(results[0].formatted_address);
+            setSearchText((prev) => prev || results[0].formatted_address);
+          } else {
+            setLocationName(`${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`);
+          }
+        });
+      }
+    }
+  }, [isLoaded]);
 
   useEffect(() => {
     return () => {
@@ -64,13 +88,27 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
     };
   }, []);
 
-  const updateSelectedLocation = (newLocation) => {
+  const updateSelectedLocation = (newLocation, newName = null) => {
     setLocation(newLocation);
     onLocationSelect(newLocation);
-    setShowInfoWindow(true);
 
     if (mapRef.current) {
       mapRef.current.panTo(newLocation);
+    }
+
+    if (newName) {
+      setLocationName(newName);
+    } else if (geocoderRef.current) {
+      geocoderRef.current.geocode({ location: newLocation }, (results, status) => {
+        if (status === "OK" && results[0]) {
+          setLocationName(results[0].formatted_address);
+          setSearchText(results[0].formatted_address);
+        } else {
+          setLocationName(`${newLocation.lat.toFixed(6)}, ${newLocation.lng.toFixed(6)}`);
+        }
+      });
+    } else {
+      setLocationName(`${newLocation.lat.toFixed(6)}, ${newLocation.lng.toFixed(6)}`);
     }
   };
 
@@ -138,7 +176,7 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
       lat: suggestion.lat,
       lng: suggestion.lng,
     };
-    updateSelectedLocation(newLocation);
+    updateSelectedLocation(newLocation, suggestion.name);
     setSearchText(suggestion.name);
     setSuggestions([]);
   };
@@ -151,21 +189,11 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
     updateSelectedLocation(newLocation);
   };
 
-  const handleScriptLoad = () => {
-    setMapLoaded(true);
-
-    if (window.google?.maps) {
-      geocoderRef.current = new window.google.maps.Geocoder();
-      if (mapRef.current) {
-        placesServiceRef.current = new window.google.maps.places.PlacesService(
-          mapRef.current,
-        );
-      }
-    }
-  };
-
   const handleMapLoad = (map) => {
     mapRef.current = map;
+    if (window.google?.maps) {
+      placesServiceRef.current = new window.google.maps.places.PlacesService(map);
+    }
   };
 
   if (!hasValidApiKey) {
@@ -279,11 +307,30 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
           </div>
         )}
       </div>
-      <LoadScript
-        googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={libraries}
-        onLoad={handleScriptLoad}
-      >
+
+      {/* Selected Location Display */}
+      <div className="mb-3 p-3 bg-green-50 border-2 border-green-400 rounded" style={{ animation: "pulse 2s infinite" }}>
+        <p className="text-green-900 text-sm font-bold">
+          ✓ Location Selected & Highlighted
+        </p>
+        <p className="text-green-800 text-sm mt-1">
+          <span className="font-bold">📍 </span>
+          {locationName || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}
+        </p>
+        <p className="text-green-700 text-xs mt-2">
+          Click anywhere on the map to select a different location
+        </p>
+      </div>
+
+      {loadError ? (
+        <div className="p-4 bg-red-50 text-red-600 rounded border border-red-200">
+          Error loading map
+        </div>
+      ) : !isLoaded ? (
+        <div style={mapContainerStyle}>
+          <Spin tip="Loading Map..." />
+        </div>
+      ) : (
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={{ lat: location.lat, lng: location.lng }}
@@ -312,79 +359,12 @@ const LocationMapPicker = ({ onLocationSelect, selectedLocation }) => {
               />
               <Marker
                 position={{ lat: location.lat, lng: location.lng }}
-                onClick={() => setShowInfoWindow(!showInfoWindow)}
-                title={`Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`}
-              >
-                {showInfoWindow && (
-                  <InfoWindow
-                    position={{ lat: location.lat, lng: location.lng }}
-                    onCloseClick={() => setShowInfoWindow(false)}
-                  >
-                    <div
-                      style={{
-                        backgroundColor: "#fff",
-                        padding: "10px",
-                        borderRadius: "4px",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                        minWidth: "180px",
-                      }}
-                    >
-                      <p
-                        style={{
-                          margin: "0 0 6px 0",
-                          fontSize: "14px",
-                          fontWeight: "bold",
-                          color: "#1967D2",
-                        }}
-                      >
-                        📍 Selected
-                      </p>
-                      <p
-                        style={{
-                          margin: "4px 0",
-                          fontSize: "12px",
-                          color: "#333",
-                        }}
-                      >
-                        <strong>Latitude:</strong>
-                        <br />
-                        {location.lat.toFixed(6)}
-                      </p>
-                      <p
-                        style={{
-                          margin: "4px 0",
-                          fontSize: "12px",
-                          color: "#333",
-                        }}
-                      >
-                        <strong>Longitude:</strong>
-                        <br />
-                        {location.lng.toFixed(6)}
-                      </p>
-                    </div>
-                  </InfoWindow>
-                )}
-              </Marker>
+                title={locationName || `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`}
+              />
             </>
           )}
         </GoogleMap>
-      </LoadScript>
-      <div
-        className="mt-3 p-3 bg-green-50 border-2 border-green-400 rounded"
-        style={{ animation: "pulse 2s infinite" }}
-      >
-        <p className="text-green-900 text-sm font-bold">
-          ✓ Location Selected & Highlighted
-        </p>
-        <p className="text-green-800 text-xs mt-2">
-          <strong>Latitude:</strong> {location.lat.toFixed(6)}
-          <br />
-          <strong>Longitude:</strong> {location.lng.toFixed(6)}
-        </p>
-        <p className="text-green-700 text-xs mt-2">
-          📍 Click anywhere on the map to select a different location
-        </p>
-      </div>
+      )}
     </div>
   );
 };
